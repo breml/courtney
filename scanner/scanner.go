@@ -1,11 +1,13 @@
 package scanner
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
 	"go/constant"
 	"go/token"
 	"go/types"
+	"os"
 	"strings"
 
 	"github.com/dave/astrid"
@@ -128,6 +130,22 @@ func (p *PackageMap) ScanPackage() error {
 		}
 		if err := fm.FindExcludes(); err != nil {
 			return errors.WithStack(err)
+		}
+	}
+
+	if p.setup.ExcludeGeneratedCode {
+		// Exclude complete files, if the code is generated.
+		for _, f := range p.pkg.GoFiles {
+			body, err := os.ReadFile(f)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			if !isGenerated(body) {
+				continue
+			}
+			for i := range bytes.Split(body, []byte("\n")) {
+				p.addExclude(f, i+1)
+			}
 		}
 	}
 	return nil
